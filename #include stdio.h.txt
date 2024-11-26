@@ -1,0 +1,63 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <winsock2.h>   // Windows sockets
+#include <ws2tcpip.h>  // For sockaddr_in
+
+#pragma comment(lib, "ws2_32.lib") // Link with ws2_32.lib
+
+int main() {
+    WSADATA wsaData;  // Winsock data structure
+    SOCKET server_sock;
+    struct sockaddr_in server, client;
+    char buffer[2000];
+    int recv_len, client_len = sizeof(client);
+
+    // Initialize Winsock
+    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
+        printf("Failed. Error Code: %d\n", WSAGetLastError());
+        return 1;
+    }
+
+    // Create a UDP socket
+    server_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (server_sock == INVALID_SOCKET) {
+        printf("Could not create socket: %d\n", WSAGetLastError());
+        return 1;
+    }
+
+    // Configure server address
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;  // Listen on all interfaces
+    server.sin_port = htons(8888);  // Server port
+
+    // Bind the socket
+    if (bind(server_sock, (struct sockaddr *)&server, sizeof(server)) == SOCKET_ERROR) {
+        printf("Bind failed. Error: %d\n", WSAGetLastError());
+        return 1;
+    }
+
+    printf("UDP server ready. Waiting for messages...\n");
+
+    // Main server loop
+    while (1) {
+        // Receive message from client
+        recv_len = recvfrom(server_sock, buffer, sizeof(buffer), 0, (struct sockaddr *)&client, &client_len);
+        if (recv_len == SOCKET_ERROR) {
+            printf("Receive failed. Error: %d\n", WSAGetLastError());
+            break;
+        }
+
+        buffer[recv_len] = '\0';  // Null-terminate the received message
+        printf("Client: %s\n", buffer);
+
+        // Echo the message back to the client
+        if (sendto(server_sock, buffer, recv_len, 0, (struct sockaddr *)&client, client_len) == SOCKET_ERROR) {
+            printf("Send failed. Error: %d\n", WSAGetLastError());
+        }
+    }
+
+    closesocket(server_sock);  // Close the socket
+    WSACleanup();  // Cleanup Winsock
+    return 0;
+}
